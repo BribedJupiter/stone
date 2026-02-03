@@ -1,5 +1,7 @@
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 import { GLView, ExpoWebGLRenderingContext } from 'expo-gl';
+import { Asset } from 'expo-asset';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 
 export default function Index() {
   return (
@@ -15,10 +17,12 @@ export default function Index() {
   );
 }
 
-function onContextCreate(gl: ExpoWebGLRenderingContext) {
+async function onContextCreate(gl: ExpoWebGLRenderingContext) {
+  const [vertData, fragData] = await readShaderData();
+
   // See expo documentation here: https://docs.expo.dev/versions/latest/sdk/gl-view/#usage
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-  gl.clearColor(1, 0, 0, 1);
+  gl.clearColor(0.4, 0, 0.4, 1);
 
   // Create vertex shader (shape & position)
   const vert: WebGLShader | null = gl.createShader(gl.VERTEX_SHADER);
@@ -26,15 +30,7 @@ function onContextCreate(gl: ExpoWebGLRenderingContext) {
     console.log("Error creating vertex shader.");
     return;
   } 
-  gl.shaderSource(
-    vert,
-    `
-    void main(void) {
-      gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
-      gl_PointSize = 150.0;
-    }
-  `
-  );
+  gl.shaderSource(vert, vertData);
   gl.compileShader(vert);
 
   // Create fragment shader (color)
@@ -43,14 +39,7 @@ function onContextCreate(gl: ExpoWebGLRenderingContext) {
     console.log("Error creating fragment shader.");
     return;
   } 
-  gl.shaderSource(
-    frag,
-    `
-    void main(void) {
-      gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-    }
-  `
-  );
+  gl.shaderSource(frag, fragData);
   gl.compileShader(frag);
 
   // Link together into a program
@@ -65,4 +54,29 @@ function onContextCreate(gl: ExpoWebGLRenderingContext) {
 
   gl.flush();
   gl.endFrameEXP();
+}
+
+async function readShaderData() {
+  const [vertFile, fragFile] = await Asset.loadAsync([
+    require("../assets/shaders/main.vert"),
+    require("../assets/shaders/main.frag"),
+  ]);
+
+  if (!vertFile.localUri) {
+    throw new URIError("Unable to find vertex shader.");
+  }
+
+  if (!fragFile.localUri) {
+    throw new URIError("Unable to find fragment shader.");
+  }
+
+  if (Platform.OS === 'web') {
+    const vertSrc = await (await fetch(vertFile.localUri)).text();
+    const fragSrc = await (await fetch(fragFile.localUri)).text();
+    return [vertSrc, fragSrc]
+  } else {
+    const vertSrc = await readAsStringAsync(vertFile.localUri);
+    const fragSrc = await readAsStringAsync(fragFile.localUri);
+    return [vertSrc, fragSrc];
+  }
 }
