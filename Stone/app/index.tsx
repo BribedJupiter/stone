@@ -2,6 +2,7 @@ import { Platform, Text, View } from "react-native";
 import { GLView, ExpoWebGLRenderingContext } from 'expo-gl';
 import { Asset } from 'expo-asset';
 import { readAsStringAsync } from 'expo-file-system/legacy';
+import  * as GLM from 'gl-matrix';
 
 export default function Index() {
   return (
@@ -12,22 +13,80 @@ export default function Index() {
         alignItems: "center",
       }}
     >
-      <GLView style={{width: 300, height: 300}} onContextCreate={onContextCreate} />
+      <GLView style={{width: 600, height: 600}} onContextCreate={onContextCreate} />
     </View>
   );
 }
 
+class Cube {
+   vertices: Float32Array;
+
+   constructor() {
+    // Vertices + normal vectors o a cube
+    this.vertices = new Float32Array([
+        -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,
+        0.5, -0.5, -0.5,  0.0,  0.0, -1.0, 
+        0.5,  0.5, -0.5,  0.0,  0.0, -1.0, 
+        0.5,  0.5, -0.5,  0.0,  0.0, -1.0, 
+        -0.5,  0.5, -0.5,  0.0,  0.0, -1.0, 
+        -0.5, -0.5, -0.5,  0.0,  0.0, -1.0, 
+
+        -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,
+        0.5, -0.5,  0.5,  0.0,  0.0, 1.0,
+        0.5,  0.5,  0.5,  0.0,  0.0, 1.0,
+        0.5,  0.5,  0.5,  0.0,  0.0, 1.0,
+        -0.5,  0.5,  0.5,  0.0,  0.0, 1.0,
+        -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,
+
+        -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
+        -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,
+        -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
+        -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,
+        -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,
+        -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,
+
+        0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
+        0.5,  0.5, -0.5,  1.0,  0.0,  0.0,
+        0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
+        0.5, -0.5, -0.5,  1.0,  0.0,  0.0,
+        0.5, -0.5,  0.5,  1.0,  0.0,  0.0,
+        0.5,  0.5,  0.5,  1.0,  0.0,  0.0,
+
+        -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
+        0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
+        0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
+        0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
+        -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,
+        -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,
+
+        -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
+        0.5,  0.5, -0.5,  0.0,  1.0,  0.0,
+        0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
+        0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
+        -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
+        -0.5,  0.5, -0.5,  0.0,  1.0,  0.0
+    ]);
+   }
+}
+
 async function onContextCreate(gl: ExpoWebGLRenderingContext) {
   const [vertData, fragData] = await readShaderData();
+  const box = new Cube();
 
   // See expo documentation here: https://docs.expo.dev/versions/latest/sdk/gl-view/#usage
+  // See also: https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Adding_2D_content_to_a_WebGL_context 
+
+  // Setup initial parameters
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
   gl.clearColor(0.4, 0, 0.4, 1);
+  gl.clearDepth(1.0);
+  gl.enable(gl.DEPTH_TEST);
 
   // Create vertex shader (shape & position)
   const vert: WebGLShader | null = gl.createShader(gl.VERTEX_SHADER);
   if (vert === null) {
-    console.log("Error creating vertex shader.");
+    console.error("Error creating vertex shader.");
+    gl.deleteShader(vert);
     return;
   } 
   gl.shaderSource(vert, vertData);
@@ -36,24 +95,107 @@ async function onContextCreate(gl: ExpoWebGLRenderingContext) {
   // Create fragment shader (color)
   const frag: WebGLShader | null = gl.createShader(gl.FRAGMENT_SHADER);
   if (frag === null) {
-    console.log("Error creating fragment shader.");
+    console.error("Error creating fragment shader.");
+    gl.deleteShader(vert);
+    gl.deleteShader(frag);
     return;
   } 
   gl.shaderSource(frag, fragData);
   gl.compileShader(frag);
+
+  // Ensure shaders are compiled correctly
+  if (!gl.getShaderParameter(vert, gl.COMPILE_STATUS)) {
+    console.error("Shaders failed to compile - ", gl.getShaderInfoLog(vert), " - AND - ", gl.getShaderInfoLog(frag));
+    gl.deleteShader(vert);
+    gl.deleteShader(frag);
+    return;
+  }
 
   // Link together into a program
   const program = gl.createProgram();
   gl.attachShader(program, vert);
   gl.attachShader(program, frag);
   gl.linkProgram(program);
+
+  // Get attribute and uniform location information fo the shader program
+  const attribLocs = {
+    // We need to figure out where these attributes are being stored on the GPU
+    vertLoc: gl.getAttribLocation(program, "aVertPos"),
+    normalLoc: gl.getAttribLocation(program, "aNormal")
+  }
+  const matrixUniformLocs = {
+    // We use three matrices to transform a model's unique position in the world into a 
+    // projected value on the screen. 
+    modelMatrix: gl.getUniformLocation(program, "uModel"),
+    viewMatrix: gl.getUniformLocation(program, "uView"),
+    projectionMatrix: gl.getUniformLocation(program, "uProjection")
+  }
+  const lightUniformLocs = {
+    // These are used in lighting calculations
+    viewPosition: gl.getUniformLocation(program, "uViewPos"),
+    material: {
+      ambient: gl.getUniformLocation(program, "uMaterial.ambient"),
+      diffuse: gl.getUniformLocation(program, "uMaterial.diffuse"), 
+      specular: gl.getUniformLocation(program, "uMaterial.specular"),
+      shininess: gl.getUniformLocation(program, "uMaterial.shininess")
+    },
+    light: {
+      position: gl.getUniformLocation(program, "uLight.position"),
+      ambient: gl.getUniformLocation(program, "uLight.ambient"),
+      diffuse: gl.getUniformLocation(program, "uLight.diffuse"),
+      specular: gl.getUniformLocation(program, "uLight.specular"),
+    }
+  }
+
+  // Setup our vertex buffer and attribute informations. This is how we know what information is stored where
+  const boxBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, boxBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, box.vertices, gl.STATIC_DRAW);
+  gl.vertexAttribPointer(attribLocs.vertLoc, 3, gl.FLOAT, false, 6 * 4, 0);
+  gl.enableVertexAttribArray(attribLocs.vertLoc);
+  gl.vertexAttribPointer(attribLocs.normalLoc, 3, gl.FLOAT, false, 6 * 4, 4 * 3); // 4 bytes per float * 6 floats stored per vertex = 24 bytes per vertex
+  gl.enableVertexAttribArray(attribLocs.normalLoc);  
   gl.useProgram(program);
 
-  gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.drawArrays(gl.POINTS, 0, 1);
+  // Create our perspective matrix
+  const projectionMatrix = GLM.mat4.create();
+  const modelMatrix = GLM.mat4.create();
+  const viewMatrix = GLM.mat4.create();
+  GLM.mat4.perspective(projectionMatrix, (45 * Math.PI / 180), gl.drawingBufferWidth / gl.drawingBufferHeight, 0.1, 100.0);
+  GLM.mat4.translate(modelMatrix, modelMatrix, [1.0, -1.0, -5.0]);
+  GLM.mat4.rotateY(modelMatrix, modelMatrix, 15);
+  gl.uniformMatrix4fv(matrixUniformLocs.projectionMatrix, false, projectionMatrix as Float32Array);
+  gl.uniformMatrix4fv(matrixUniformLocs.modelMatrix, false, modelMatrix as Float32Array);
+  gl.uniformMatrix4fv(matrixUniformLocs.viewMatrix, false, viewMatrix as Float32Array);
 
-  gl.flush();
-  gl.endFrameEXP();
+  // Setup lighting
+  gl.uniform3fv(lightUniformLocs.viewPosition, [0, 0, 0]);
+  gl.uniform3fv(lightUniformLocs.material.ambient, [1.0, 0.5, 0.31]);
+  gl.uniform3fv(lightUniformLocs.material.diffuse, [1.0, 0.5, 0.31]);
+  gl.uniform3fv(lightUniformLocs.material.specular, [0.5, 0.5, 0.5]);
+  gl.uniform1f(lightUniformLocs.material.shininess, 32.0);
+  gl.uniform3fv(lightUniformLocs.light.position, [0.0, 0.0, 0.6]);
+  gl.uniform3fv(lightUniformLocs.light.ambient, [1.0, 0.5, 0.31]);
+  gl.uniform3fv(lightUniformLocs.light.diffuse, [1.0, 0.5, 0.31]);
+  gl.uniform3fv(lightUniformLocs.light.specular, [0.5, 0.5, 0.5]);
+
+
+  // Start drawing frames
+  let shouldQuit = false; 
+  while(!shouldQuit) {
+    // Draw a frame
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 36);
+
+    gl.flush();
+    gl.endFrameEXP();
+
+    shouldQuit = true;
+  }
+
+  gl.deleteShader(vert); // not needed anymore
+  gl.deleteShader(frag); // same here
 }
 
 async function readShaderData() {
