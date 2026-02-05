@@ -24,7 +24,7 @@ let lastFrameTime = 0;
 
 class Cube {
    vertices: Float32Array;
-   modelMatrix: GLM.mat4;
+   modelMatrices: GLM.mat4[];
    modelLoc: WebGLUniformLocation | null;
 
    constructor() {
@@ -73,7 +73,7 @@ class Cube {
         -0.5,  0.5, -0.5,  0.0,  1.0,  0.0
     ]);
 
-    this.modelMatrix = GLM.mat4.create();
+    this.modelMatrices = [GLM.mat4.create(), GLM.mat4.create(), GLM.mat4.create(), GLM.mat4.create()];
     this.modelLoc = null;
    }
 }
@@ -167,7 +167,7 @@ async function onContextCreate(gl: ExpoWebGLRenderingContext) {
   const boxBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, boxBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, box.vertices, gl.STATIC_DRAW);
-  gl.vertexAttribPointer(attribLocs.vertLoc, 3, gl.FLOAT, false, 6 * 4, 0);
+  gl.vertexAttribPointer(attribLocs.vertLoc, 3, gl.FLOAT, false, 6 * 4, 0); // using VAO 0 by default
   gl.enableVertexAttribArray(attribLocs.vertLoc);
   gl.vertexAttribPointer(attribLocs.normalLoc, 3, gl.FLOAT, false, 6 * 4, 4 * 3); // 4 bytes per float * 6 floats stored per vertex = 24 bytes per vertex
   gl.enableVertexAttribArray(attribLocs.normalLoc);  
@@ -177,10 +177,13 @@ async function onContextCreate(gl: ExpoWebGLRenderingContext) {
   const projectionMatrix = GLM.mat4.create();
   const viewMatrix = GLM.mat4.create();
   GLM.mat4.perspective(projectionMatrix, (45 * Math.PI / 180), gl.drawingBufferWidth / gl.drawingBufferHeight, 0.1, 100.0);
-  GLM.mat4.translate(box.modelMatrix, box.modelMatrix, [1.0, -1.0, -5.0]);
-  GLM.mat4.rotateY(box.modelMatrix, box.modelMatrix, 15);
+  GLM.mat4.translate(box.modelMatrices[0], box.modelMatrices[0], [1.0, -1.0, -5.0]);
+  GLM.mat4.rotateY(box.modelMatrices[0], box.modelMatrices[0], 15);
+  GLM.mat4.translate(box.modelMatrices[1], box.modelMatrices[1], [-1.0, -1.0, -5.0]);
+  GLM.mat4.translate(box.modelMatrices[2], box.modelMatrices[2], [1.0, 1.0, -5.0]);
+  GLM.mat4.translate(box.modelMatrices[3], box.modelMatrices[3], [-1.0, 1.0, -5.0]);
   gl.uniformMatrix4fv(matrixUniformLocs.projectionMatrix, false, projectionMatrix as Float32Array);
-  gl.uniformMatrix4fv(matrixUniformLocs.modelMatrix, false, box.modelMatrix as Float32Array);
+  gl.uniformMatrix4fv(matrixUniformLocs.modelMatrix, false, box.modelMatrices[0] as Float32Array);
   gl.uniformMatrix4fv(matrixUniformLocs.viewMatrix, false, viewMatrix as Float32Array);
 
   // Setup lighting
@@ -223,18 +226,33 @@ function drawFrame(time: number) {
     }
 
     // Check time
-    const delta = (lastFrameTime - time) / 1000;
+    const delta = (time - lastFrameTime) / 1000;
     lastFrameTime = time;
 
-    // Update models
-    GLM.mat4.rotateY(box.modelMatrix, box.modelMatrix, delta);
-    gl.uniformMatrix4fv(box.modelLoc, false, box.modelMatrix as Float32Array);
-
-    // Actually draw
+    // Prepare draw
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    // Box 1
+    GLM.mat4.rotateY(box.modelMatrices[0], box.modelMatrices[0], delta);
+    gl.uniformMatrix4fv(box.modelLoc, false, box.modelMatrices[0] as Float32Array);
     gl.drawArrays(gl.TRIANGLES, 0, 36);
 
+    // Box 2
+    GLM.mat4.rotateX(box.modelMatrices[1], box.modelMatrices[1], delta * 2);
+    gl.uniformMatrix4fv(box.modelLoc, false, box.modelMatrices[1] as Float32Array);
+    gl.drawArrays(gl.TRIANGLES, 0, 36);
+
+    // Box 3
+    GLM.mat4.rotateZ(box.modelMatrices[2], box.modelMatrices[2], delta * 3);
+    gl.uniformMatrix4fv(box.modelLoc, false, box.modelMatrices[2] as Float32Array);
+    gl.drawArrays(gl.TRIANGLES, 0, 36);
+
+    // Box 4
+    GLM.mat4.rotateY(box.modelMatrices[3], box.modelMatrices[3], delta * -1);
+    gl.uniformMatrix4fv(box.modelLoc, false, box.modelMatrices[3] as Float32Array);
+    gl.drawArrays(gl.TRIANGLES, 0, 36);
+
+    // End frame
     gl.flush();
     gl.endFrameEXP();
     window.requestAnimationFrame(drawFrame);
