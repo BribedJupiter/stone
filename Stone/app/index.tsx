@@ -13,7 +13,7 @@ export default function Index() {
         alignItems: "center",
       }}
     >
-      <GLView style={{width: 600, height: 600}} onContextCreate={onContextCreate} />
+      <GLView style={{width: 300, height: 300}} onContextCreate={onContextCreate} />
     </View>
   );
 }
@@ -93,8 +93,8 @@ async function onContextCreate(gl: ExpoWebGLRenderingContext) {
   // Setup initial parameters
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
   gl.clearColor(0.4, 0, 0.4, 1);
-  gl.clearDepth(1.0);
   gl.enable(gl.DEPTH_TEST);
+  gl.depthFunc(gl.LEQUAL);
 
   // Create vertex shader (shape & position)
   const vert: WebGLShader | null = gl.createShader(gl.VERTEX_SHADER);
@@ -192,8 +192,7 @@ async function onContextCreate(gl: ExpoWebGLRenderingContext) {
   gl.uniform3fv(lightUniformLocs.light.position, [0.0, 0.0, 0.6]);
   gl.uniform3fv(lightUniformLocs.light.ambient, [1.0, 0.5, 0.31]);
   gl.uniform3fv(lightUniformLocs.light.diffuse, [1.0, 0.5, 0.31]);
-  gl.uniform3fv(lightUniformLocs.light.specular, [0.5, 0.5, 0.5]);
-
+  gl.uniform3fv(lightUniformLocs.light.specular, [1.0, 1.0, 1.0]);
 
   // Start drawing frames
   drawFrame(lastFrameTime);
@@ -234,7 +233,7 @@ function drawFrame(time: number) {
     // Actually draw
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 36);
+    gl.drawArrays(gl.TRIANGLES, 0, 36);
 
     gl.flush();
     gl.endFrameEXP();
