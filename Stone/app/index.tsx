@@ -1,4 +1,4 @@
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
 import { GLView, ExpoWebGLRenderingContext } from 'expo-gl';
 import { Asset } from 'expo-asset';
 import { readAsStringAsync } from 'expo-file-system/legacy';
@@ -18,8 +18,14 @@ export default function Index() {
   );
 }
 
+let glRef: ExpoWebGLRenderingContext | null = null;
+let shaderProgram: WebGLProgram | null = null;
+let lastFrameTime = 0;
+
 class Cube {
    vertices: Float32Array;
+   modelMatrix: GLM.mat4;
+   modelLoc: WebGLUniformLocation | null;
 
    constructor() {
     // Vertices + normal vectors o a cube
@@ -66,12 +72,20 @@ class Cube {
         -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,
         -0.5,  0.5, -0.5,  0.0,  1.0,  0.0
     ]);
+
+    this.modelMatrix = GLM.mat4.create();
+    this.modelLoc = null;
    }
 }
+const box = new Cube();
 
 async function onContextCreate(gl: ExpoWebGLRenderingContext) {
   const [vertData, fragData] = await readShaderData();
-  const box = new Cube();
+
+  // Set our reference
+  if (!glRef) {
+    glRef = gl;
+  }
 
   // See expo documentation here: https://docs.expo.dev/versions/latest/sdk/gl-view/#usage
   // See also: https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Adding_2D_content_to_a_WebGL_context 
@@ -116,6 +130,7 @@ async function onContextCreate(gl: ExpoWebGLRenderingContext) {
   gl.attachShader(program, vert);
   gl.attachShader(program, frag);
   gl.linkProgram(program);
+  shaderProgram = program;
 
   // Get attribute and uniform location information fo the shader program
   const attribLocs = {
@@ -146,6 +161,7 @@ async function onContextCreate(gl: ExpoWebGLRenderingContext) {
       specular: gl.getUniformLocation(program, "uLight.specular"),
     }
   }
+  box.modelLoc = matrixUniformLocs.modelMatrix;
 
   // Setup our vertex buffer and attribute informations. This is how we know what information is stored where
   const boxBuffer = gl.createBuffer();
@@ -159,13 +175,12 @@ async function onContextCreate(gl: ExpoWebGLRenderingContext) {
 
   // Create our perspective matrix
   const projectionMatrix = GLM.mat4.create();
-  const modelMatrix = GLM.mat4.create();
   const viewMatrix = GLM.mat4.create();
   GLM.mat4.perspective(projectionMatrix, (45 * Math.PI / 180), gl.drawingBufferWidth / gl.drawingBufferHeight, 0.1, 100.0);
-  GLM.mat4.translate(modelMatrix, modelMatrix, [1.0, -1.0, -5.0]);
-  GLM.mat4.rotateY(modelMatrix, modelMatrix, 15);
+  GLM.mat4.translate(box.modelMatrix, box.modelMatrix, [1.0, -1.0, -5.0]);
+  GLM.mat4.rotateY(box.modelMatrix, box.modelMatrix, 15);
   gl.uniformMatrix4fv(matrixUniformLocs.projectionMatrix, false, projectionMatrix as Float32Array);
-  gl.uniformMatrix4fv(matrixUniformLocs.modelMatrix, false, modelMatrix as Float32Array);
+  gl.uniformMatrix4fv(matrixUniformLocs.modelMatrix, false, box.modelMatrix as Float32Array);
   gl.uniformMatrix4fv(matrixUniformLocs.viewMatrix, false, viewMatrix as Float32Array);
 
   // Setup lighting
@@ -181,21 +196,49 @@ async function onContextCreate(gl: ExpoWebGLRenderingContext) {
 
 
   // Start drawing frames
-  let shouldQuit = false; 
-  while(!shouldQuit) {
-    // Draw a frame
+  drawFrame(lastFrameTime);
+
+  gl.deleteShader(vert); // not needed anymore
+  gl.deleteShader(frag); // same here
+}
+
+function drawFrame(time: number) {
+    // Ensure we have an OpenGL context
+    if (!glRef) {
+      console.error("Frame drawn without a WebGL context");
+      return;
+    }
+    const gl = glRef;
+
+    // Ensure we have a valid shader program
+    if (!shaderProgram) {
+      console.error("Frame drawn without a shader program");
+      return;
+    }
+    const program = shaderProgram;
+
+    // Ensure we have a valid location for the model matrix uniform
+    if (!box.modelLoc) {
+      console.error("No model matrix location");
+      return;
+    }
+
+    // Check time
+    const delta = (lastFrameTime - time) / 1000;
+    lastFrameTime = time;
+
+    // Update models
+    GLM.mat4.rotateY(box.modelMatrix, box.modelMatrix, delta);
+    gl.uniformMatrix4fv(box.modelLoc, false, box.modelMatrix as Float32Array);
+
+    // Actually draw
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 36);
 
     gl.flush();
     gl.endFrameEXP();
-
-    shouldQuit = true;
-  }
-
-  gl.deleteShader(vert); // not needed anymore
-  gl.deleteShader(frag); // same here
+    window.requestAnimationFrame(drawFrame);
 }
 
 async function readShaderData() {
