@@ -35,10 +35,11 @@ void main() {
     vec3 diffuse = uLight.diffuse * (diff * uMaterial.diffuse);
 
     // Specular
-    vec3 viewDir = normalize(uViewPos - FragPos);
-    vec3 reflectDir = reflect(-lightDir, norm); 
-    float spec = pow(max(dot(uViewPos, reflectDir), 0.00001), uMaterial.shininess);
-    vec3 specular = uLight.specular * (spec * uMaterial.specular);
+    // vec3 viewDir = normalize(uViewPos - FragPos);
+    // vec3 reflectDir = reflect(-lightDir, norm); 
+    // float spec = pow(max(dot(uViewPos, reflectDir), 0.00001), uMaterial.shininess);
+    // vec3 specular = uLight.specular * (spec * uMaterial.specular);
+    vec3 specular = vec3(0);
 
     vec3 result = ambient + diffuse + specular;
     gl_FragColor = vec4(result, 1.0);
