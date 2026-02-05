@@ -1,4 +1,4 @@
-#version 300 es
+#version 100
 precision mediump float; // Use medium precision for floats
 
 struct Material {
@@ -15,10 +15,8 @@ struct Light {
     vec3 specular;
 };
 
-out vec4 FragColor;
-
-in vec3 Normal;
-in vec3 FragPos;
+varying vec3 Normal;
+varying vec3 FragPos;
 
 uniform vec3 uViewPos;
 uniform Material uMaterial;
@@ -43,5 +41,5 @@ void main() {
     vec3 specular = uLight.specular * (spec * uMaterial.specular);
 
     vec3 result = ambient + diffuse + specular;
-    FragColor = vec4(result, 1.0);
+    gl_FragColor = vec4(result, 1.0);
 }

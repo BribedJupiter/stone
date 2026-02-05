@@ -1,16 +1,16 @@
-#version 300 es
-layout (location = 0) in vec3 aVertPos;
-layout (location = 1) in vec3 aNormal;
+#version 100
+attribute vec3 aVertPos;
+attribute vec3 aNormal;
 
 uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
-out vec3 Normal;
-out vec3 FragPos;
+varying vec3 Normal;
+varying vec3 FragPos;
 
 void main() {
     gl_Position = uProjection * uView * uModel * vec4(aVertPos, 1.0);
-    Normal = mat3(transpose(inverse(uModel))) * aNormal;
+    Normal = mat3(uModel) * aNormal; // Since there is no non-uniform scaling, this is fine
     FragPos = vec3(uModel * vec4(aVertPos, 1.0));
 }
